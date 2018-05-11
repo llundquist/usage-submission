@@ -1,0 +1,482 @@
+openapi: 3.0.0
+servers:
+  - url: 'https://metering-collector-rc.bluemix.net'
+    description: Production
+info:
+  description: >-
+    IBM Cloud Usage Metering is a platform service that enables service providers
+    to submit metrics collected for resource instances provisioned by IBM Cloud
+    users. Third-party service providers delivering an Integrated Billing service in IBM Cloud are required to submit usage for all active service instances every hour. This is important because inability to report usage can lead to loss of revenue collection for IBM, in turn causing loss of revenue share for the third-party service provider.
+
+
+    ### Prerequisites
+
+    * You must be approved to deliver an Integrated Billing service in IBM Cloud
+    * You must have a registered service in the Resource Management Console (RMC)
+    * Your Pricing plan must be successsfully published to the IBM Cloud catalog, and updated with prices for all chargeable metrics in the plans of the resource.
+    * Metering and rating definitions for all the plans in the resource have been verified.
+
+    ### Usage records
+
+    Usage records are the smallest entities that contribute to the aggregated
+    values of the metrics. A usage record is constructed using the following
+    fields
+
+
+    Field Name | Description
+
+    --|--
+
+    resource_instance_id | ID of the resource instance as registered in the
+    resource controller (The IBM Cloud provisioning layer)
+
+    plan_id | The contract by which the usage record should be aggregated and
+    rated
+
+    start | Time from which the usage was measured. This is specified in
+    milliseconds since epoch
+
+    end | Time to which the usage was measured. This is specified in
+    milliseconds since epoch
+
+    region | The service provider region in which the usage was measured
+
+    measured_usage | An array of measures with its values
+
+    consumer_id | Optional field. If aggregation is required at a consumer level
+    then this field is required. Having a value for consumer_id for any other
+    reason might result in incorrect aggregation. The consumer_id is known only
+    to the service provider.
+
+
+    ### Submitting Usage Records
+
+    Metering supports submitting multiple usage records in one API call. A
+    maximum of 100 usage records can be submitted per call. The response body
+    will include the acceptance status of every usage record. Any status other
+    than `201` is accompanied with an error code and indicates that there is
+    some problem with the usage record and was not accepted. The following table
+    lists the status codes and the necessary action that's required.
+
+    Status Code | Action required
+
+    -- | --
+
+    >= 500 | Retry submission. If problem persists, contact your IBM representative
+
+    400 | The usage record is not in correct format. Either the schema
+    validation has failed, or the measures in the usage records are incorrect or
+    the start and end times does not fall between the provisioned and
+    de-provisioned times. Fix the usage record and re-submit.
+
+    424 | The resource instance's metadata in the resource controller has some
+    issues. Fix the resource instance details and resubmit usage.
+
+    404 | The metering definition has not been on-boarded. Work with your IBM representative to check if the resource is on-boarded and resubmit the usage record.
+
+    409 | The usage record is a duplicate. Do not retry.
+
+
+
+    ### Guidelines
+
+
+    * The start time and end time represent the time range during which the
+    measures were collected and it is not dependent on the time at which the
+    usage record is submitted to the metering APIs.
+
+    * Usage records are facts. Once a usage record is created, its contents
+    should not be altered. The metering service acknowledges with a location
+    when a usage record has been successfully created. If an error code is
+    returned then please refer to the actions that you might have to take.
+
+    * A usage record is uniquely identified by the signature `account_id/resource_group_id/resource_instance_id/consumer_id/plan_id/region/start/end`.
+    Once a usage record is processed, any other usage record with the same
+    signature is rejected as a duplicate.
+
+    * Usage records should be submitted within 2 days from the time at which the
+    measurement was completed. Older usage records are rejected.
+
+
+    ### Best Practices
+
+
+    * All service providers must submit usage every 1 hour
+    so that the end user does not see a delay between the time that the
+    resource was consumed to the time that the cost is reflected in their
+    accounts.
+
+    * Retry submission of usage records only if there was a genuine failure with
+    the previous request. Do not resubmit usage records that were successfully
+    accepted.
+
+
+    ### Aggregation Levels
+
+
+    Aggregation is always to the plan + pricing plan. Aggregations happen at
+    three levels.
+
+
+    1. Instance + Consumer
+
+    2. Resource Group
+
+    3. Account (Invoices are generated from the aggregated values in the
+    account)
+
+
+    An instance once provisioned will have the same pricing plan for the entire
+    billing period (month). The pricing plan is determined based on the date on
+    which the instance is provisioned.
+  version: 4.0.7
+  title: Bluemix Usage Metering
+  contact:
+    name: IBM
+paths:
+  '/v4/metering/resources/{resource_id}/usage':
+    post:
+      summary: Resource Usage
+      description: Report usage for resource instances
+      parameters:
+        - name: authorization
+          in: header
+          required: true
+          description: >-
+            IAM Token of the resource provider with authorization to submit
+            usage for the resource specified in `resource_id` parameter. This value is not your IAM service name, it is your IAM operator service ID. You can find this value in the *IAM Operator Service ID* field in the RMC - IAM page.
+          schema:
+            type: string
+      responses:
+        '202':
+          description: >-
+            Indicates that the submitted payload was successfully stored. The
+            status of indvidual usage records are available as a part of the
+            resources array and it has one to one correspondence with the usage
+            records in the payload. A status value of `201` indicates that they
+            will be rated and any other value indicates a failure.
+          headers:
+            location:
+              description: Location where the payload is stored
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_accepted'
+              examples:
+                response:
+                  value: |-
+                    {
+                        "resources": [
+                            {
+                                "code": "schema_validation_failed",
+                                "status": 400,
+                                "message": "Schema validation failed for usage",
+                                "details": [
+                                    {
+                                        "field": "data.resource_instance_id",
+                                        "message": "is required",
+                                        "value": {
+                                            "start": 1501282845663,
+                                            "end": 1501282845664,
+                                            "region": "us-south",
+                                            "plan_id": "04082014.ibm.node.default",
+                                            "measured_usage": [
+                                                {
+                                                    "measure": "current_running_instances",
+                                                    "quantity": 1
+                                                },
+                                                {
+                                                    "measure": "current_instance_memory",
+                                                    "quantity": 1
+                                                }
+                                            ]
+                                        },
+                                        "type": "object"
+                                    }
+                                ]
+                            },
+                            {
+                                "status": 201,
+                                "location": "/v4/metering/resources/sdk-for-nodejs/usage/normalized/t%2F0001501468312892-0-0-1-0%2Fk%2F265d9d22597d4ee589138929093f1246"
+                            },
+                            {
+                                "code": "invalid_usage",
+                                "status": 400,
+                                "message": "Usage cannot have an end date earlier than start date"
+                            },
+                            {
+                                "code": "plan_not_found",
+                                "status": 404,
+                                "message": "Plan idonotexist not found in resource sdk-for-nodejs"
+                            },
+                            {
+                                "code": "expired_usage",
+                                "status": 400,
+                                "message": "Usage should be submitted within 172800000ms"
+                            }
+                        ]
+                    }
+        '400':
+          description: Schema validation failed for the payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error_response'
+              examples:
+                response:
+                  value: |-
+                    {
+                      "errors": [
+                        {
+                          "code": "schema_validation_failed",
+                          "message": "Schema validation failed for resource",
+                          "details": [
+                            {
+                              "field": "data",
+                              "message": "is the wrong type",
+                              "value": {
+                                "payload": "Not a valid payload"
+                              },
+                              "type": "array"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+        '401':
+          description: Unauthenticated
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error_response'
+              examples:
+                response:
+                  value: |-
+                    {
+                      "errors": [
+                        {
+                          "code": "authentication_failed",
+                          "message": "Invalid or no authorization header provided"
+                        }
+                      ]
+                    }
+        '403':
+          description: User is not authorized to submit usage for the resource
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error_response'
+              examples:
+                response:
+                  value: |-
+                    {
+                      "errors": [
+                        {
+                          "code": "authorization_failed",
+                          "message": "Authorization failed"
+                        }
+                      ]
+                    }
+        '404':
+          description: Resource definition not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error_response'
+              examples:
+                response:
+                  value: |-
+                    {
+                      "errors": [
+                        {
+                          "code": "provisioning_plan_not_found",
+                          "message": "Plan test-plan not found"
+                        }
+                      ]
+                    }
+        '413':
+          description: Payload is too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error_response'
+              examples:
+                response:
+                  value: |-
+                    {
+                      "errors": [
+                        {
+                          "code": "payload_too_large",
+                          "message": "'Maximum of 100 usage records can be submitted per request'"
+                        }
+                      ]
+                    }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/resource_usage'
+        required: true
+    parameters:
+      - name: resource_id
+        in: path
+        required: true
+        description: Resource for which the usage is submitted
+        schema:
+          type: string
+components:
+  schemas:
+    resource_usage:
+      type: array
+      description: Array of usage records
+      items:
+        $ref: '#/components/schemas/resource_instance_usage'
+      example:
+        - start: 1485907200001
+          end: 1485910800000
+          region: us-south
+          resource_instance_id: >-
+            crn:v1:bluemix:staging:database-service:us-south:a/1c8ae972c35e470d994b6faff9494ce1:793ff3d3-9fe3-4329-9ea0-404703a3c371::
+          plan_id: database-lite
+          measured_usage:
+            - measure: QUERIES
+              quantity: 100
+            - measure: STORAGE
+              quantity: 123.456
+        - start: 1485910800000
+          end: 1485910800000
+          resource_instance_id: ed20abbe-8870-44e6-90f7-56d764c21127
+          plan_id: database-lite
+          measured_usage:
+            - measure: instances
+              quantity:
+                previous: 0
+                current: 1
+    resource_instance_usage:
+      type: object
+      required:
+        - measured_usage
+        - resource_instance_id
+        - plan_id
+        - start
+        - end
+      properties:
+        resource_instance_id:
+          type: string
+          description: >-
+            ID of the instance which incurred the usage. The ID is a CRN for
+            instances provisioned with resource controller.
+          example: >-
+            crn:v1:bluemix:staging:database-service:us-south:a/1c8ae972c35e470d994b6faff9494ce1:793ff3d3-9fe3-4329-9ea0-404703a3c371::
+        plan_id:
+          type: string
+          description: Plan with which the instance's usage should be metered
+          example: database-lite
+        region:
+          type: string
+          description: >-
+            Pricing region to which the usage must be aggregated. Required if ID
+            is not a CRN or if the CRN does not have a region.
+          example: us-south
+        start:
+          type: integer
+          description: >-
+            Time from which the resource instance was metered (Time in
+            milliseconds since epoch)
+          example: 1485907200000
+        end:
+          type: integer
+          description: >-
+            Time until which the resource instance was metered (Time in
+            milliseconds since epoch). This value will be the same as start
+            value for event based submissions.
+          example: 1485907200000
+        measured_usage:
+          type: array
+          items:
+            $ref: '#/components/schemas/measure_and_quantity'
+        consumer_id:
+          type: string
+          description: >-
+            If an instance's usage should be aggregated at the consumer level,
+            then supply the id of the consumer. Usage will be accumulated to
+            instance-consumer combination
+          example: 'cf-application:ed20abbe-8870-44e6-90f7-56d764c21127'
+    measure_and_quantity:
+      type: object
+      required:
+        - measure
+        - quantity
+      properties:
+        measure:
+          type: string
+          description: Name of the measure
+          example: STORAGE
+        quantity:
+          type: object
+          description: >
+            For consupmtion based submissions quantity can be a double or
+            integer value. For event based submissions that does not have binary
+            states, previous and current values are required { "previous": 1,
+            "current": 2 }
+          example: 1
+    resource_usage_details:
+      type: object
+      required:
+        - location
+        - status
+      properties:
+        status:
+          type: number
+          description: Response code similar to HTTP status codes
+        location:
+          type: string
+          description: Location of the usage
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Description of the error
+    response_accepted:
+      type: object
+      required:
+        - resources
+      properties:
+        resources:
+          type: array
+          description: Response body containing the status of each usage record submitted
+          items:
+            $ref: '#/components/schemas/resource_usage_details'
+      description: Response when usage submitted is accepted
+    error_response:
+      type: object
+      required:
+        - errors
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/error'
+    error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
