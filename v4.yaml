@@ -61,24 +61,13 @@ info:
     some problem with the usage record and was not accepted. The following table
     lists the status codes and the necessary action that's required.
 
-    Status Code | Action required
-
-    -- | --
-
-    500 | Retry submission. If problem persists, contact your IBM representative
-
-    400 | The usage record is not in correct format. Either the schema
-    validation has failed, or the measures in the usage records are incorrect or
-    the start and end times does not fall between the provisioned and
-    de-provisioned times. Fix the usage record and re-submit.
-
-    424 | The resource instance's metadata in the resource controller has some
-    issues. Fix the resource instance details and resubmit usage.
-
-    404 | The metering definition has not been on-boarded. Work with your IBM representative to check if the resource is on-boarded and resubmit the usage record.
-
-    409 | The usage record is a duplicate. Do not retry.
-
+    | Status Code | Action required |
+    | -- | -- |
+    | >=500 | Retry submission. If problem persists, contact your IBM representative |
+    | 400 | The usage record is not in correct format. Either the schema validation has failed, or the measures in the usage records are incorrect or the start and end times does not fall between the provisioned and de-provisioned times. Fix the usage record and re-submit. |
+    | 424 | The resource instance's metadata in the resource controller has someissues. Fix the resource instance details and resubmit usage. |
+    | 404 | The metering definition has not been on-boarded. Work with your IBM representative to check if the resource is on-boarded and resubmit the usage record. |
+    | 409 | The usage record is a duplicate. Do not retry.  |
 
 
     ### Guidelines
