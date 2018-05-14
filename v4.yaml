@@ -12,8 +12,11 @@ info:
     ### Prerequisites
 
     * You must be approved to deliver an Integrated Billing service in IBM Cloud
+    
     * You must have a registered service in the Resource Management Console (RMC)
+    
     * Your Pricing plan must be successsfully published to the IBM Cloud catalog, and updated with prices for all chargeable metrics in the plans of the resource.
+    
     * Metering and rating definitions for all the plans in the resource have been verified.
 
     ### Usage records
