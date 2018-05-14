@@ -60,6 +60,7 @@ info:
     than `201` is accompanied with an error code and indicates that there is
     some problem with the usage record and was not accepted. The following table
     lists the status codes and the necessary action that's required.
+    
 
     | Status Code | Action required |
     | -- | -- |
